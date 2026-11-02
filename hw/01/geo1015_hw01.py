@@ -5,12 +5,13 @@
 import argparse
 import json
 import sys
+from typing import Any
 
 import rasterio
 import startinpy
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="My GEO1015.2026 hw01")
     parser.add_argument("inputfile", type=str, help="GeoTIFF")
     parser.add_argument(
@@ -22,24 +23,25 @@ def main():
         "range", type=str, help="a Python range for the contours, eg: (0, 1000, 100)"
     )
 
-    args = parser.parse_args()
+    args: argparse.Namespace = parser.parse_args()
 
     # Validate thinning factor
     if not 0 <= args.thinning <= 1:
         parser.error("Thinning factor must be between 0 and 1")
     # Validate the range
+    tmp: list[int]
     try:
         tmp = list(map(int, args.range.strip("() ").split(",")))
     except:
         parser.error("range invalid")
-    myrange = range(tmp[0], tmp[1], tmp[2])
+    myrange: range = range(tmp[0], tmp[1], tmp[2])
     print("Extracting the contours at:", list(myrange))
 
     # -- load in memory the input GeoTIFF
     try:
         # -- this gives you a Rasterio dataset
         # -- https://rasterio.readthedocs.io/en/latest/quickstart.html
-        d = rasterio.open(args.inputfile)
+        d: rasterio.io.DatasetReader = rasterio.open(args.inputfile)
     except Exception as e:
         print(e)
         sys.exit()
@@ -63,22 +65,23 @@ def main():
     print("z-coordinate of first vertex: ", dt.points[first_vertex][2])
 
     # -- create a dummy GeoJSON file
-    mygeojson = create_dummy_geojson()
+    mygeojson: dict[str, Any] = create_dummy_geojson()
 
     # -- write the triangulation to a PLY file
     dt.write_ply("mydt.ply")
     print("File 'mydt.ply' created.")
+
     # -- write the contours to a GeoJSON file
     with open("mycontours.geojson", "w") as file:
         file.write(json.dumps(mygeojson, indent=2))
         print("File 'mycontour.geojson' created.")
 
 
-def create_dummy_geojson():
-    mygeojson = {}
+def create_dummy_geojson() -> dict[str, Any]:
+    mygeojson: dict[str, Any] = {}
     mygeojson["type"] = "FeatureCollection"
     mygeojson["features"] = []
-    f = {}
+    f: dict[str, Any] = {}
     f["type"] = "Feature"
     f["geometry"] = {"type": "LineString", "coordinates": [[0, 0], [10, 10]]}
     f["properties"] = {"height": 100, "azimuth": 45, "lightness": 0.75}

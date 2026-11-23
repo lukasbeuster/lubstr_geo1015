@@ -1,6 +1,6 @@
 # -- geo1015.2026.hw01
-# -- [YOUR NAME]
-# -- [YOUR STUDENT NUMBER]
+# -- Lukas Beuster
+# -- 924055
 
 import argparse
 import json
@@ -75,8 +75,8 @@ def main() -> None:
     # -- visit the triangles
     trs = dt.triangles
     # Polyscope uses 0-based indexing, and startinpy returns 1-based indices for triangles.
-    # We need to adjust the indices to be 0-based.
-    trs = trs - 1
+    # We need to adjust the indices to be 0-based. # What impact does this have downstream?
+    trs = trs - 1 # NOTE: remove before getting out. Solved with pts[0] = pts[1] before triangulation in the 3D vis example.
     
     one_triangle = trs[0]
     first_vertex = one_triangle[0]

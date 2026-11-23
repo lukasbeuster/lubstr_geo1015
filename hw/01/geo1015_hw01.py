@@ -69,9 +69,7 @@ def main() -> None:
     # -- create the TIN
     # -- full docs: https://startinpy.readthedocs.io
     dt = startinpy.DT()
-    dt.insert_one_pt([2, 3, 4])
-    dt.insert_one_pt([12, 3, 42])
-    dt.insert_one_pt([6, 1, 4])
+    dt.insert(pts, insertionstrategy="BBox")
 
     # -- visit the triangles
     trs = dt.triangles

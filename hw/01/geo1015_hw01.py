@@ -9,6 +9,7 @@ from typing import Any
 
 import rasterio
 import startinpy
+import random
 
 
 def main() -> None:
@@ -50,6 +51,20 @@ def main() -> None:
     print("crs:", d.crs)
     print("size:", d.shape)
     print("no_data:", d.nodata)
+    
+    band1 = d.read(1) # Read first layer of raster file
+    print(band1)
+    t = d.transform # Gets the local transformation.
+    print(f'Transform 2 (Origin x?): {t[2]}, Transform 5 (Origin y?): {t[5]} and Transform 0 (cell size x?): {t[0]}, and Transform 4 (pixel size y?): {t[4]}') # What is transform 2? Coordinate?
+    pts = [] #Empty pt list to fill
+    print(band1.shape[0])
+    for i in range(band1.shape[0]): # For each x coordinate (or y?)
+        for j in range(band1.shape[1]): # For each y coordinate (or x?), do something. How do nested loops work again?
+            x = t[2] + (j * t[0]) + (t[0] / 2) # Retreives the x of the cell centre coordinate. origin x + (x cell count * cell size) + (x cell count /2) - but what is origin? I need a visual example of this.
+            y = t[5] + (i * t[4]) + (t[4] / 2) # Same as above, but with the y coordinate, and with the y size (negative).
+            z = band1[i][j] # Extracts the z coordinate for this cell.
+            if (z != d.nodatavals) and (random.randint(0, 100) == 5): #Why random?
+                pts.append([x, y, z]) # Adds to the list of centre coordinates, including the z coordinate.
 
     # -- create the TIN
     # -- full docs: https://startinpy.readthedocs.io

@@ -4,12 +4,13 @@
 
 import argparse
 import json
+import random
 import sys
 from typing import Any
 
 import rasterio
 import startinpy
-import random
+import polyscope as ps
 
 
 def main() -> None:
@@ -73,9 +74,29 @@ def main() -> None:
 
     # -- visit the triangles
     trs = dt.triangles
+    # Polyscope uses 0-based indexing, and startinpy returns 1-based indices for triangles.
+    # We need to adjust the indices to be 0-based.
+    trs = trs - 1
+    
     one_triangle = trs[0]
     first_vertex = one_triangle[0]
     print("z-coordinate of first vertex: ", dt.points[first_vertex][2])
+    
+    # -- Add visualisation
+    ps.init()
+    ps.set_program_name("mydt")
+    ps.set_up_dir("z_up")
+    ps.set_ground_plane_mode("shadow_only")
+    ps.set_ground_plane_height_factor(0.01, is_relative=True)
+    ps.set_autocenter_structures(True)
+    ps.set_autoscale_structures(True)
+    pc = ps.register_point_cloud(
+        "mypoints", pts[1:], radius=0.0015, point_render_mode="sphere"
+    )
+    ps_mesh = ps.register_surface_mesh("mysurface", pts, trs)
+    ps_mesh.reset_transform()
+    pc.reset_transform()
+    ps.show()
 
     # -- create a dummy GeoJSON file
     mygeojson: dict[str, Any] = create_dummy_geojson()
@@ -83,6 +104,7 @@ def main() -> None:
     # -- write the triangulation to a PLY file
     dt.write_ply("mydt.ply")
     print("File 'mydt.ply' created.")
+    
 
     # -- write the contours to a GeoJSON file
     with open("mycontours.geojson", "w") as file:

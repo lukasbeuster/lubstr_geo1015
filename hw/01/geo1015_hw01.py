@@ -94,12 +94,15 @@ def main() -> None:
     
     # -- Looping through the triangles
     
+    dtpts = dt.points   # copy of points to avoid making copies for each call in the loop
+    dttrs = dt.triangles # same as above. 
+    
     features = []                              # empty "bag" that will hold one GeoJSON feature per contour segment
     for z0 in myrange:                         # OUTER loop: each contour height, eg 100, 200, 300 ...
-        for tr in dt.triangles:                # INNER loop: each triangle; tr = 3 row numbers into dt.points, eg [17, 4, 230]
-            a = dt.points[tr[0]]               # look up row tr[0] -> the actual corner [x, y, z] (no -1: row 0 is the infinite vertex)
-            b = dt.points[tr[1]]               # second corner
-            c = dt.points[tr[2]]               # third corner
+        for tr in dt.dttrs:                # INNER loop: each triangle; tr = 3 row numbers into dt.points, eg [17, 4, 230]
+            a = dt.dtpts[tr[0]]               # look up row tr[0] -> the actual corner [x, y, z] (no -1: row 0 is the infinite vertex)
+            b = dt.dtpts[tr[1]]               # second corner
+            c = dt.dtpts[tr[2]]               # third corner
             seg = intersect_triangle(a, b, c, z0)   # [] or [[x1, y1], [x2, y2]], oriented: higher ground on the left
 
             if seg:                            # an empty list counts as False, a list with points as True

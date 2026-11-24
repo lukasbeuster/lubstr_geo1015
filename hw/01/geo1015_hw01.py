@@ -64,8 +64,16 @@ def main() -> None:
             x = t[2] + (j * t[0]) + (t[0] / 2) # Retreives the x of the cell centre coordinate. origin x + (x cell count * cell size) + (x cell count /2) - but what is origin? I need a visual example of this.
             y = t[5] + (i * t[4]) + (t[4] / 2) # Same as above, but with the y coordinate, and with the y size (negative).
             z = band1[i][j] # Extracts the z coordinate for this cell.
-            if (z != d.nodatavals) and (random.randint(0, 100) == 5): #Why random?
+            if (z != d.nodata): # Removed randomness. 
                 pts.append([x, y, z]) # Adds to the list of centre coordinates, including the z coordinate.
+    
+    n =  int(args.thinning*(band1.shape[0]*band1.shape[1]))
+    
+    if n > len(pts):
+        print(f'Sample is larger than possible population (Expected sample: {n} > valid points). All {len(pts)} valid points returned, ')
+    else:
+        pts = random.sample(pts, n)
+
 
     # -- create the TIN
     # -- full docs: https://startinpy.readthedocs.io
@@ -76,27 +84,30 @@ def main() -> None:
     trs = dt.triangles
     # Polyscope uses 0-based indexing, and startinpy returns 1-based indices for triangles.
     # We need to adjust the indices to be 0-based. # What impact does this have downstream?
-    trs = trs - 1 # NOTE: remove before getting out. Solved with pts[0] = pts[1] before triangulation in the 3D vis example.
+    # trs = trs - 1 # NOTE: remove before getting out. Solved with pts[0] = pts[1] before triangulation in the 3D vis example.
     
     one_triangle = trs[0]
     first_vertex = one_triangle[0]
     print("z-coordinate of first vertex: ", dt.points[first_vertex][2])
     
-    # -- Add visualisation
-    ps.init()
-    ps.set_program_name("mydt")
-    ps.set_up_dir("z_up")
-    ps.set_ground_plane_mode("shadow_only")
-    ps.set_ground_plane_height_factor(0.01, is_relative=True)
-    ps.set_autocenter_structures(True)
-    ps.set_autoscale_structures(True)
-    pc = ps.register_point_cloud(
-        "mypoints", pts[1:], radius=0.0015, point_render_mode="sphere"
-    )
-    ps_mesh = ps.register_surface_mesh("mysurface", pts, trs)
-    ps_mesh.reset_transform()
-    pc.reset_transform()
-    ps.show()
+    # # -- Add visualisation
+    # ps.init()
+    # ps.set_program_name("mydt")
+    # ps.set_up_dir("z_up")
+    # ps.set_ground_plane_mode("shadow_only")
+    # ps.set_ground_plane_height_factor(0.01, is_relative=True)
+    # ps.set_autocenter_structures(True)
+    # ps.set_autoscale_structures(True)
+    # pc = ps.register_point_cloud(
+    #     "mypoints", pts[1:], radius=0.0015, point_render_mode="sphere"
+    # )
+    # ps_mesh = ps.register_surface_mesh("mysurface", pts, trs)
+    # ps_mesh.reset_transform()
+    # pc.reset_transform()
+    # ps.show()
+    
+    # -- Conversion to Isolines
+    ## In principle: Reminder that this would be easier with a sample triangle. Figure that out first, then revert to loading it all. 
 
     # -- create a dummy GeoJSON file
     mygeojson: dict[str, Any] = create_dummy_geojson()

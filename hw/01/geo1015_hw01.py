@@ -129,18 +129,13 @@ def main() -> None:
 
 def intersect_triangle(a, b, c, z0):
     """
-    Where does the flat plane at height z0 cut the triangle abc?
+    Where does the flat plane at height z0 ("the water level") cut the triangle abc?
 
+    a, b, c: the three corners, each [x, y, z].
     Returns:
-      - [] if there is no contour piece in this triangle
-      - [[x1, y1], [x2, y2]] the two ends of the contour piece (2D, no z needed:
-        we already know z = z0). Order does not matter yet.
-
-    Hints, in the order you might need them:
-      1. For each corner: is it above, below, or exactly at z0? # Loop through the corners, check against z0
-      2. Which edges are crossed? (corners on opposite sides) # If z0 is between corners, then that edge between is crossed
-      3. Where on a crossed edge? (how far z0 is between the two corner heights) # proportionally between
-      4. Then deal with corners exactly at z0 (see the special-case tests). # No idea how. 
+      - [] if this triangle has no contour piece at z0
+      - [[x1, y1], [x2, y2]]: the two ends of the contour piece, ordered so that
+        higher ground is on the LEFT when walking from the first to the second point.
     """
     # -- quick exit: water entirely above or below the triangle
     z_vals = [a[2], b[2], c[2]]                 # the three corner heights
@@ -150,7 +145,7 @@ def intersect_triangle(a, b, c, z0):
     # -- step 1: label each corner relative to the water level
     vertices = [a, b, c]                        # corners in a list, so we can use index 0, 1, 2
     labels = []                                 # will hold one label per corner
-    points = []                                 # crossing points found so far
+    points = []                                 # contour points found so far (corners on z0 + edge crossings)
     for v in vertices:                          # visit each corner
         z = v[2]                                # [2] = height (z) of this corner
         if z > z0:
@@ -158,27 +153,50 @@ def intersect_triangle(a, b, c, z0):
         elif z < z0:
             labels.append(-1)                   # -1 = below the water
         else:
-            labels.append(0)
-            points.append(v[0:2])                    #  0 = exactly on the water line
-    # print("labels:", labels)
+            labels.append(0)                    #  0 = exactly on the water line
+            points.append(v[0:2])               # this corner IS a contour point: keep [x, y] (slice 0:2 stops before z)
 
     # -- step 2: walk along each edge, find where the water crosses it
-    # points = []                                 # crossing points found so far
     edges = [(0, 1), (1, 2), (2, 0)]            # the 3 edges as pairs of corner numbers: a-b, b-c, c-a
     for i, j in edges:                          # one round per edge
         p, q = vertices[i], vertices[j]         # name tags: p = start of this edge, q = end
         if labels[i] * labels[j] == -1:         # -1 only if one end is below and the other above
             frac = (z0 - p[2]) / (q[2] - p[2])  # how far along p->q the water sits (0 = at p, 1 = at q)
-            # print(frac)
             x = p[0] + frac * (q[0] - p[0])     # start at p's x, move frac of the way to q's x
             y = p[1] + frac * (q[1] - p[1])     # same for y ([1] = y)
             points.append([x, y])               # save the crossing (2D: z is z0 anyway)
-    
-    if len(points) == 2: # 2 points = one contour piece; 0 = nothing
-        return points
-        
+
+    # -- step 3: only exactly 2 points make a contour piece
+    #    (0 = water misses, 1 = only touches a corner, 3 = flat triangle: neighbours provide the lines)
+    if len(points) == 2:
+        # -- step 4: orientation, so that higher ground is on the LEFT of the segment
+        # (4a) find a "witness": any corner above the water (all of them lie on the same, higher side)
+        witness = None                          # "none found yet"
+        for k in range(3):                      # k = 0, 1, 2 -> the three corners
+            if labels[k] == 1:                  # +1 = above the water
+                witness = vertices[k]           # remember that corner [x, y, z]
+        if witness is None:                     # no corner above: the edge lies on z0 and the third corner is below.
+            return []                           # skip; the neighbouring triangle (third corner above) outputs this
+                                                # edge correctly oriented, which also avoids a duplicate segment
+
+        # (4b) short names, matching the orient formula
+        a = points[0]                           # first end of the segment  [x, y]
+        b = points[1]                           # second end of the segment [x, y]
+        p = witness                             # the high corner           [x, y, z] (only x and y are used)
+
+        # (4c) orient test (book: Orient predicate, ch. 4) = "blue rectangle minus orange rectangle"
+        #      u = b - a (walking direction), v = p - a (towards the witness); orient = u_x * v_y - u_y * v_x
+        #      + : witness on the LEFT of a->b    - : witness on the RIGHT    (0 would mean on the line)
+        orient = (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0])
+
+        # (4d) witness on the right -> we walk the wrong way -> turn around
+        if orient < 0:
+            points = [points[1], points[0]]     # swap the two ends
+        return points                           # oriented contour piece
+
     else:
-        return []    
+        return []                               # any other count -> nothing to draw in this triangle
+
 
 def create_dummy_geojson() -> dict[str, Any]:
     mygeojson: dict[str, Any] = {}

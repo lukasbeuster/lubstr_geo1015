@@ -36,7 +36,7 @@ def main() -> None:
         tmp = list(map(int, args.range.strip("() ").split(",")))
     except:
         parser.error("range invalid")
-    myrange: range = range(tmp[0], tmp[1], tmp[2]) # Only for 3? Potential to fix... 
+    myrange: range = range(tmp[0], tmp[1], tmp[2])   # eg "(0, 1000, 100)" -> 0, 100, ..., 900
     print("Extracting the contours at:", list(myrange))
 
     # -- load in memory the input GeoTIFF
@@ -52,57 +52,42 @@ def main() -> None:
     print("crs:", d.crs)
     print("size:", d.shape)
     print("no_data:", d.nodata)
-    
-    band1 = d.read(1) # Read first layer of raster file
-    # print(band1)
-    t = d.transform # Gets the local transformation.
-    # print(f'Transform 2 (Origin x?): {t[2]}, Transform 5 (Origin y?): {t[5]} and Transform 0 (cell size x?): {t[0]}, and Transform 4 (pixel size y?): {t[4]}')
-    pts = [] #Empty pt list to fill
-    # print(band1.shape[0])
-    for i in range(band1.shape[0]): # For each x coordinate (or y?)
-        for j in range(band1.shape[1]): # For each y coordinate (or x?), do something. How do nested loops work again?
-            x = t[2] + (j * t[0]) + (t[0] / 2) # Retreives the x of the cell centre coordinate. origin x + (x cell count * cell size) + (x cell count /2) - but what is origin? I need a visual example of this.
-            y = t[5] + (i * t[4]) + (t[4] / 2) # Same as above, but with the y coordinate, and with the y size (negative).
-            z = band1[i][j] # Extracts the z coordinate for this cell.
-            if (z != d.nodata): # Removed randomness. 
-                pts.append([x, y, z]) # Adds to the list of centre coordinates, including the z coordinate.
-    
-    n =  int(args.thinning*(band1.shape[0]*band1.shape[1]))
-    
-    if n > len(pts):
-        print(f'Sample is larger than possible population (Expected sample: {n} > valid points). All {len(pts)} valid points returned, ')
-    else:
-        pts = random.sample(pts, n)
 
+    # -- collect the centre of every valid grid cell as a 3D point [x, y, z]
+    band1 = d.read(1)                           # the elevation grid as a 2D array (rows x columns)
+    t = d.transform                             # geotransform: t[2], t[5] = x, y of the top-left corner of the grid;
+                                                #               t[0] = cell width, t[4] = cell height (negative: rows go down)
+    pts = []                                    # all valid cell centres
+    for i in range(band1.shape[0]):             # i = row number (moving down the grid, sets y)
+        for j in range(band1.shape[1]):         # j = column number (moving right, sets x)
+            x = t[2] + (j * t[0]) + (t[0] / 2)  # cell centre x: left edge + j cells + half a cell
+            y = t[5] + (i * t[4]) + (t[4] / 2)  # cell centre y: top edge + i cells (downwards) + half a cell
+            z = band1[i][j]                     # elevation of this cell
+            if z != d.nodata and not math.isnan(z):   # skip no-data cells (both a no-data value and NaN). Tsk Tsk... 
+                pts.append([x, y, z])
+
+    # -- random sample: exactly thinning x (all cells), drawn from the valid cells only
+    n = int(args.thinning * (band1.shape[0] * band1.shape[1]))
+    if n > len(pts):                            # not enough valid cells (no-data present): use all of them
+        print(f"Requested {n} points, but only {len(pts)} valid cells: all valid cells are used.")
+    else:
+        pts = random.sample(pts, n)             # draws exactly n different cells at random
 
     # -- create the TIN
     # -- full docs: https://startinpy.readthedocs.io
     dt = startinpy.DT()
     dt.insert(pts, insertionstrategy="BBox")
 
-    # -- visit the triangles
-    trs = dt.triangles
-    # Polyscope uses 0-based indexing, and startinpy returns 1-based indices for triangles.
-    # We need to adjust the indices to be 0-based. # What impact does this have downstream?
-    # trs = trs - 1 # NOTE: remove before getting out. Solved with pts[0] = pts[1] before triangulation in the 3D vis example.
-    
-    one_triangle = trs[0]
-    first_vertex = one_triangle[0]
-    print("z-coordinate of first vertex: ", dt.points[first_vertex][2])
-    
-    print(dt.triangles[1])
-    
-    # -- Looping through the triangles
-    
-    dtpts = dt.points   # copy of points to avoid making copies for each call in the loop
-    dttrs = dt.triangles # same as above. 
+    # -- extract the contours: every contour height x every triangle
+    dtpts = dt.points                          # read ONCE: dt.points builds a new copy of all points on every access (good one!)
+    dttrs = dt.triangles                       # same for the triangles
     
     features = []                              # empty "bag" that will hold one GeoJSON feature per contour segment
     for z0 in myrange:                         # OUTER loop: each contour height, eg 100, 200, 300 ...
-        for tr in dt.dttrs:                # INNER loop: each triangle; tr = 3 row numbers into dt.points, eg [17, 4, 230]
-            a = dt.dtpts[tr[0]]               # look up row tr[0] -> the actual corner [x, y, z] (no -1: row 0 is the infinite vertex)
-            b = dt.dtpts[tr[1]]               # second corner
-            c = dt.dtpts[tr[2]]               # third corner
+        for tr in dttrs:                # INNER loop: each triangle; tr = 3 row numbers into dt.points, eg [17, 4, 230]
+            a = dtpts[tr[0]]               # look up row tr[0] -> the actual corner [x, y, z] (no -1: row 0 is the infinite vertex)
+            b = dtpts[tr[1]]               # second corner
+            c = dtpts[tr[2]]               # third corner
             seg = intersect_triangle(a, b, c, z0)   # [] or [[x1, y1], [x2, y2]], oriented: higher ground on the left
 
             if seg:                            # an empty list counts as False, a list with points as True

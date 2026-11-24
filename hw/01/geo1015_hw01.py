@@ -7,6 +7,7 @@ import json
 import random
 import sys
 from typing import Any
+import math
 
 import rasterio
 import startinpy
@@ -100,14 +101,29 @@ def main() -> None:
             a = dt.points[tr[0]]               # look up row tr[0] -> the actual corner [x, y, z] (no -1: row 0 is the infinite vertex)
             b = dt.points[tr[1]]               # second corner
             c = dt.points[tr[2]]               # third corner
-            seg = intersect_triangle(a, b, c, z0)   # [] or [[x1, y1], [x2, y2]] for this triangle at this height
+            seg = intersect_triangle(a, b, c, z0)   # [] or [[x1, y1], [x2, y2]], oriented: higher ground on the left
+
             if seg:                            # an empty list counts as False, a list with points as True
+                # -- azimuth: compass direction of the oriented segment (N = 0, E = 90, S = 180, W = 270)
+                dx = seg[1][0] - seg[0][0]     # how far the segment goes right: second point's x - first point's x
+                dy = seg[1][1] - seg[0][1]     # how far the segment goes up:    second point's y - first point's y
+                # atan2(y, x) measures from EAST, anticlockwise (maths convention);
+                # swapping the arguments, atan2(dx, dy), measures from NORTH, clockwise (compass convention).
+                # degrees() converts from radians; % 360 (modulo) wraps -180..180 onto 0..360 (eg -90 -> 270)
+                azimuth = math.degrees(math.atan2(dx, dy)) % 360
+                
+                # -- lightness: how much this segment faces the light (formula from the assignment page)
+                #    light from the north-west: azimuth 225 -> 100 (white), 45 -> 0 (black), 135/315 -> 50
+                l = abs(((azimuth - 225) % 360) - 180)    # 0..180: angular distance between this direction and 45 degrees
+                lightness = l / 180 * 100                 # rescale to 0..100, as QGIS's color_hsl() expects
+                
+                # -- pack the segment as one GeoJSON feature
                 f = {}                         # one GeoJSON feature = a Python dict
                 f["type"] = "Feature"
                 f["geometry"] = {"type": "LineString",       # a line through the two points
                                  "coordinates": [[float(seg[0][0]), float(seg[0][1])],   # float(): numpy numbers -> plain Python numbers for json
                                                  [float(seg[1][0]), float(seg[1][1])]]}
-                f["properties"] = {"height": z0, "azimuth": 0, "lightness": 0}   # attributes; azimuth/lightness are placeholders for now
+                f["properties"] = {"height": z0, "azimuth": azimuth, "lightness": lightness}   # the 3 attributes the assignment asks for
                 features.append(f)             # put this feature in the bag
     print(len(features), "contour segments")
 
